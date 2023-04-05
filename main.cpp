@@ -4,7 +4,9 @@
 void runServer(unsigned short port);
 void runClient(unsigned short port);
 void printTime();
-std::string userName = "AlCatSplat";
+std::string clientName;
+//sf::Packet packet;
+sf::TcpSocket client;
 
 int main()
 {
@@ -27,29 +29,47 @@ void runServer(unsigned short port)
 
 	sf::Packet packet;
 
-	std::string clientMessage;
+	
 
-	sf::TcpSocket client;
+	client.setBlocking(false);
+
+	
 
 	std::cout << "Server is listening for connections on port " << listener.getLocalPort() << "..." << std::endl;
 
 	while (true) {
+		
 		if (listener.accept(client) == sf::Socket::Done) {
-			std::cout << client.getRemoteAddress() << " has connected to the server." << std::endl;
+			std::cout << client.getRemoteAddress() << " has connected to the server." << std::endl;			
 		}
 		else {
 			std::cout << "A networking error has occured." << std::endl;
 		}
 
-		packet >> clientMessage;
-
+		std::string clientMessage;
 		if (client.receive(packet) == sf::Socket::Done) {
 			std::cout << "Message received." << std::endl;
-			std::cout << userName << ": " << clientMessage << std::endl;
+			std::cout << clientName << "> " << clientMessage << std::endl;
 		}
 		else {
 			std::cout << "Message was not received." << std::endl;
 		}
+		
+		if (packet >> clientName) {
+			std::cout << "Success!";
+		}
+		else {
+			std::cout << "Error: failed to read client name!";
+		}
+
+		if (packet >> clientMessage) {
+			std::cout << "Success!";
+		}
+		else {
+			std::cout << "Error: failed to read message data!";
+		}
+
+		
 	}	
 }
 
@@ -58,6 +78,8 @@ void runClient(unsigned short port)
 	sf::IpAddress serverIP;
 	unsigned short portChoice;
 
+	std::cout << "Pick a username: ";
+	std::cin >> clientName;
 	std::cout << "Enter server address: ";
 	std::cin >> serverIP;
 	std::cout << "Enter server port: ";
@@ -67,12 +89,16 @@ void runClient(unsigned short port)
 
 	sf::Packet packet;
 
+	
+
 	std::string clientMessage;
 
 	sf::Socket::Status status = socket.connect(serverIP, portChoice);
 
 	if (status == sf::Socket::Done) {
-		std::cout << "Welcome to the server, " << userName << "! ";
+		packet << clientName;
+		client.send(packet);
+		std::cout << "Welcome to the server, " << clientName << "! ";
 		std::cout << "You are connected to " << socket.getRemoteAddress() << " on port " << socket.getRemotePort() << std::endl;
 		printTime();
 	}
@@ -83,10 +109,8 @@ void runClient(unsigned short port)
 	while (true) {
 		std::cout << "Type message: ";
 		std::cin >> clientMessage;
-
 		packet << clientMessage;
-
-		if (socket.send(packet) == sf::Socket::Done) {
+		if (client.send(packet) == sf::Socket::Done) {
 			std::cout << "Message sent successfully." << std::endl;
 			packet.clear();
 		}
