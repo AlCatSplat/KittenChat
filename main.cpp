@@ -4,21 +4,24 @@
 void runServer(unsigned short port);
 void runClient(unsigned short port);
 void printTime();
-std::string clientName;
-//sf::Packet packet;
-sf::TcpSocket client;
-
 int main()
 {
-	bool isHost;
-	std::cout << "Are you the host?\n";
-	std::cin >> isHost;
-	if (isHost) {
-		runServer(5896);
-	}
-	else {
-		runClient(5896);
-	}
+	char isHost;
+	do {
+		std::cout << "Are you the host? (y / n)\n";
+		std::cin >> isHost;
+		if (isHost == 'y') {
+			runServer(5896);
+		}
+		else if (isHost == 'n') {
+			runClient(5896);
+		}
+		else {
+			std::cout << "Please enter y for yes, n for no." << std::endl;
+			std::cin.clear();
+			std::cin.ignore(1000, '\n');
+		}
+	} while (isHost != 'y' && isHost != 'n');
 }
 
 void runServer(unsigned short port)
@@ -27,97 +30,105 @@ void runServer(unsigned short port)
 
 	listener.listen(sf::Socket::AnyPort);
 
-	sf::Packet packet;
-
-	
-
-	client.setBlocking(false);
-
-	
-
 	std::cout << "Server is listening for connections on port " << listener.getLocalPort() << "..." << std::endl;
 
 	while (true) {
-		
+
+		sf::TcpSocket client;
+
+		//client.setBlocking(false);
+
+		bool clientDisconnected = false;
+
 		if (listener.accept(client) == sf::Socket::Done) {
-			std::cout << client.getRemoteAddress() << " has connected to the server." << std::endl;			
+			std::cout << client.getRemoteAddress() << " has connected to the server." << std::endl;
 		}
 		else {
 			std::cout << "A networking error has occured." << std::endl;
 		}
 
-		std::string clientMessage;
-		if (client.receive(packet) == sf::Socket::Done) {
-			std::cout << "Message received." << std::endl;
-			std::cout << clientName << "> " << clientMessage << std::endl;
-		}
-		else {
-			std::cout << "Message was not received." << std::endl;
-		}
-		
-		if (packet >> clientName) {
-			std::cout << "Success!";
-		}
-		else {
-			std::cout << "Error: failed to read client name!";
+		char cName[17] = {0};
+		char cMes[500] = {0};
+
+		std::size_t nameSize;
+		std::size_t messageSize;
+		if (client.receive(cName, sizeof(cName), nameSize) != sf::Socket::Done) {
+			std::cout << "Unable to read client username." << std::endl;
 		}
 
-		if (packet >> clientMessage) {
-			std::cout << "Success!";
-		}
-		else {
-			std::cout << "Error: failed to read message data!";
+		while (!clientDisconnected) {
+			if (client.receive(cMes, sizeof(cMes), messageSize) == sf::Socket::Done) {
+				std::cout << cName << "> " << cMes << std::endl;
+			}
+			else {
+				clientDisconnected = true;
+			}
 		}
 
-		
-	}	
+		if (clientDisconnected) {
+			std::cout << client.getRemoteAddress() << " has disconnected." << std::endl;
+			clientDisconnected = false;
+		}
+
+	}
 }
 
 void runClient(unsigned short port)
 {
 	sf::IpAddress serverIP;
 	unsigned short portChoice;
+	bool isConnected = false;
 
-	std::cout << "Pick a username: ";
-	std::cin >> clientName;
-	std::cout << "Enter server address: ";
-	std::cin >> serverIP;
-	std::cout << "Enter server port: ";
-	std::cin >> portChoice;
-	
-	sf::TcpSocket socket;
+	char cMesOut[500] = "";
+	char cName[17] = "";
 
-	sf::Packet packet;
+	sf::Socket::Status status;
+	do {
+		std::cout << "Pick a username: ";
+		std::cin >> cName;
+		if (std::strlen(cName) > 16) {
+			std::cout << "Name must be 16 characters or less." << std::endl;
+		}
+	} while (std::strlen(cName) > 16);
 
-	
+	do {
+		std::cout << "Enter server address: ";
+		std::cin >> serverIP;
+		if (serverIP == "") {
+			std::cout << "Server address cannot be blank" << std::endl;
+		}
+		std::cout << "Enter server port: ";
+		std::cin >> portChoice;
+		std::cin.ignore(1000, '\n');
+		sf::TcpSocket socket;
 
-	std::string clientMessage;
+		status = socket.connect(serverIP, portChoice);
 
-	sf::Socket::Status status = socket.connect(serverIP, portChoice);
-
-	if (status == sf::Socket::Done) {
-		packet << clientName;
-		client.send(packet);
-		std::cout << "Welcome to the server, " << clientName << "! ";
-		std::cout << "You are connected to " << socket.getRemoteAddress() << " on port " << socket.getRemotePort() << std::endl;
-		printTime();
-	}
-	else {
-		std::cout << "Failed connection." << std::endl;
-	}
-
-	while (true) {
-		std::cout << "Type message: ";
-		std::cin >> clientMessage;
-		packet << clientMessage;
-		if (client.send(packet) == sf::Socket::Done) {
-			std::cout << "Message sent successfully." << std::endl;
-			packet.clear();
+		if (status == sf::Socket::Done) {
+			socket.send(cName, sizeof(cName));
+			std::cout << "Welcome to the server, " << cName << "! ";
+			std::cout << "You are connected to " << socket.getRemoteAddress() << " on port " << socket.getRemotePort() << std::endl;
+			printTime();
+			isConnected = true;
+			while (isConnected) {				
+				std::cout << cName << "> ";
+				std::cin.getline(cMesOut, 500);			
+				if (socket.send(cMesOut, sizeof(cMesOut)) == sf::Socket::Done) {
+					//std::cout << "Message sent successfully." << std::endl;
+				}
+				else {
+					std::cout << "Message could not be delivered. Please check your internet connection." << std::endl;
+					isConnected = false;
+					std::cout << "You have been disconnected from the server." << std::endl;
+					std::cout << std::endl;
+				}
+			}
 		}
 		else {
-			std::cout << "Message could not be delivered. Please check your internet connection." << std::endl;
+			std::cout << "Failed to connect to server." << std::endl;
 		}
-	}
+
+	} while (true);
 }
 
 void printTime()
