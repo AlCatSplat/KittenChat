@@ -11,10 +11,10 @@ int main()
 		std::cout << "Are you the host? (y / n)\n";
 		std::cin >> isHost;
 		if (isHost == 'y') {
-			runServer(5896);
+			runServer(50068);
 		}
 		else if (isHost == 'n') {
-			runClient(5896);
+			runClient(50068);
 		}
 		else {
 			std::cout << "Please enter y for yes, n for no." << std::endl;
@@ -28,13 +28,15 @@ void runServer(unsigned short port)
 {
 	sf::TcpListener listener;
 
-	listener.listen(sf::Socket::AnyPort);
+	listener.listen(port);
 
 	std::cout << "Server is listening for connections on port " << listener.getLocalPort() << "..." << std::endl;
 
 	while (true) {
 
 		sf::TcpSocket client;
+
+		sf::TcpSocket client2;
 
 		//client.setBlocking(false);
 
